@@ -106,46 +106,53 @@ function displayRecipes(recipesToDisplay, page) {
   for (var r = 0; r < pageRecipes.length; r++) {
     var recipe = pageRecipes[r];
     var card = document.createElement("div");
-    card.className = "col card-recipe";
+    card.className = "col";
 
     var ingredientsHtml = "";
     if (recipe.ingredients && recipe.ingredients.length) {
       for (var k = 0; k < recipe.ingredients.length; k++) {
         var ing = recipe.ingredients[k];
-        ingredientsHtml += "<li>" + escapeHtml(ing.ingredient || "");
-        if (ing.quantity || ing.quantity === 0)
-          ingredientsHtml += " : " + escapeHtml(String(ing.quantity));
-        if (ing.unit) ingredientsHtml += " " + escapeHtml(ing.unit);
-        ingredientsHtml += "</li>";
+        ingredientsHtml +=
+          '<div class="ingredient">' +
+          '  <span class="ingredient-name">' +
+          escapeHtml(ing.ingredient || "") +
+          "</span>" +
+          '  <span class="ingredient-quantity">' +
+          (ing.quantity ? escapeHtml(String(ing.quantity)) : "") +
+          (ing.unit ? " " + escapeHtml(ing.unit) : "") +
+          "</span>" +
+          "</div>";
       }
     }
 
     card.innerHTML =
-      '<div class="card h-100 position-relative">' +
-      '  <img src="images/' +
+      '<article class="card-recipe">' +
+      '<img src="images/' +
       escapeHtml(recipe.image) +
       '" alt="' +
       escapeHtml(recipe.name) +
       '" class="card-img-top" loading="lazy">' +
-      '  <span class="badge rounded-pill position-absolute">' +
+      '<span class="duration-badge">' +
       escapeHtml(String(recipe.time || 0)) +
       "min</span>" +
-      '  <div class="card-body">' +
-      '    <h5 class="card-title">' +
+      '<div class="content">' +
+      '<h2 class="recipe-title">' +
       escapeHtml(recipe.name) +
-      "</h5>" +
-      '    <div class="section-title">Recette</div>' +
-      '    <p class="card-text">' +
+      "</h2>" +
+      '<div class="recipe-section">' +
+      '<span class="recipe-label">RECETTE</span>' +
+      '<p class="recipe-description">' +
       escapeHtml(recipe.description || "") +
       "</p>" +
-      '    <div class="ingredients mb-2">' +
-      "      <strong>Ingrédients :</strong>" +
-      '      <ul class="mb-0">' +
+      "</div>" +
+      '<div class="recipe-section">' +
+      '<span class="recipe-label">INGRÉDIENTS</span>' +
+      '<div class="ingredients-grid">' +
       ingredientsHtml +
-      "</ul>" +
-      "    </div>" +
-      "  </div>" +
-      "</div>";
+      "</div>" +
+      "</div>" +
+      "</div>" +
+      "</article>";
 
     var imgEl = card.querySelector("img");
     (function (recipeRef, imgRef) {
@@ -207,7 +214,11 @@ function updatePagination(total, page) {
    Rôle: Mettre à jour le compteur de recettes */
 function updateCount(n) {
   var el = document.getElementById("recipes-count");
-  if (el) el.textContent = n + " recette" + (n > 1 ? "s" : "");
+  if (el) {
+    var total = typeof n === "number" && n >= 0 ? n : 0;
+    var label = total > 1 ? "recettes" : "recette";
+    el.textContent = total + " " + label;
+  }
 }
 
 /* Fonction: getSearchOptions
@@ -310,45 +321,129 @@ function renderDropdown(ulId, entries, type) {
   }
 
   var html = "";
+  // input de recherche en tête du dropdown
+  html +=
+    '<li class="px-3 pt-2 pb-2"><input type="search" class="dropdown-search form-control" placeholder="Rechercher..." aria-label="Rechercher ' +
+    escapeHtml(type) +
+    '" data-dropdown="' +
+    escapeHtml(ulId) +
+    '"></li>';
+
   if (!entries.length) {
-    html =
+    html +=
       '<li><span class="dropdown-item text-muted" aria-disabled="true">Aucune option</span></li>';
   } else {
     for (var i = 0; i < entries.length; i++) {
       var key = entries[i][0];
       var display = entries[i][1];
       var isSel = !!selectedSet[key];
+
+      html += "<li>";
+      // bouton principal (ajout) : si sélectionné on ajoute la classe selected (visuel)
       html +=
-        "<li>" +
-        '  <button class="dropdown-item d-flex justify-content-between align-items-center" ' +
-        '          data-type="' +
+        '<button class="dropdown-item d-flex justify-content-between align-items-center' +
+        (isSel ? " selected" : "") +
+        '" ' +
+        'data-type="' +
         type +
         '" data-value="' +
         escapeHtml(display) +
-        '" ' +
-        (isSel ? "disabled" : "") +
+        '"' +
+        (isSel ? ' aria-pressed="true"' : "") +
         ">" +
-        "    <span>" +
+        '<span class="dropdown-item-label">' +
         escapeHtml(display) +
-        "</span>" +
-        (isSel
-          ? '<span class="badge text-bg-secondary">sélectionné</span>'
-          : "") +
-        "  </button>" +
-        "</li>";
+        "</span>";
+
+      // si sélectionné, ajouter une croix pour la suppression
+      if (isSel) {
+        html +=
+          '<button type="button" class="dropdown-remove" aria-label="Retirer" ' +
+          'data-remove-type="' +
+          type +
+          '" data-remove-value="' +
+          escapeHtml(display) +
+          '">×</button>';
+      } else {
+        // chevron / rien à droite pour non sélectionné (ou icône si souhaité)
+        html += '<span class="dropdown-item-empty"></span>';
+      }
+
+      html += "</button></li>";
     }
   }
+
   ul.innerHTML = html;
 
+  // filtrage live
+  var searchInput = ul.querySelector(".dropdown-search");
+  if (searchInput) {
+    searchInput.addEventListener("input", function () {
+      var term = loopNormalize(this.value || "");
+      var buttons = ul.querySelectorAll("button.dropdown-item");
+      for (var b = 0; b < buttons.length; b++) {
+        var btn = buttons[b];
+        var label = btn.querySelector(".dropdown-item-label");
+        var text = label
+          ? loopNormalize(label.textContent || "")
+          : loopNormalize(btn.textContent || "");
+        btn.parentElement.style.display =
+          text.indexOf(term) !== -1 ? "" : "none";
+      }
+    });
+  }
+
+  // clic sur option (ajout) — n'ajoute pas si déjà sélectionné
   var buttons = ul.querySelectorAll("button.dropdown-item");
-  for (var b = 0; b < buttons.length; b++) {
+  for (var b2 = 0; b2 < buttons.length; b2++) {
     (function (btn) {
-      btn.addEventListener("click", function () {
+      btn.addEventListener("click", function (ev) {
+        // si on a cliqué sur la croix interne, ignorer (la suppression est gérée ailleurs)
+        if (
+          ev.target &&
+          ev.target.classList &&
+          ev.target.classList.contains("dropdown-remove")
+        ) {
+          return;
+        }
+        // si l'item est marqué selected, ne rien faire
+        if (btn.classList.contains("selected")) return;
         var typeAttr = btn.getAttribute("data-type");
         var val = btn.getAttribute("data-value");
         addTag(typeAttr, val);
+        closeAllDropdowns();
+        // fermer le dropdown bootstrap si disponible
+        try {
+          var dd = btn.closest(".dropdown");
+          if (dd) {
+            var toggle = dd.querySelector('[data-bs-toggle="dropdown"]');
+            if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
+          }
+        } catch (e) {}
       });
-    })(buttons[b]);
+    })(buttons[b2]);
+  }
+
+  // clic sur la croix de suppression dans le dropdown
+  var removes = ul.querySelectorAll(".dropdown-remove");
+  for (var r = 0; r < removes.length; r++) {
+    (function (rm) {
+      rm.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var t = rm.getAttribute("data-remove-type");
+        var v = rm.getAttribute("data-remove-value");
+        removeTag(t, v);
+        closeAllDropdowns();
+        // fermer le dropdown bootstrap si disponible
+        try {
+          var dd2 = rm.closest(".dropdown");
+          if (dd2) {
+            var toggle2 = dd2.querySelector('[data-bs-toggle="dropdown"]');
+            if (toggle2) bootstrap.Dropdown.getOrCreateInstance(toggle2).hide();
+          }
+        } catch (e) {}
+      });
+    })(removes[r]);
   }
 }
 
@@ -363,38 +458,38 @@ function renderSelectedTags() {
 
   for (i = 0; i < selectedIngredientTags.length; i++) {
     html +=
-      '<span class="badge rounded-pill text-bg-primary d-inline-flex align-items-center" style="gap:6px">' +
-      "  <span>" +
+      '<span class="tag">' +
+      '  <span class="tag-label">' +
       escapeHtml(selectedIngredientTags[i]) +
       "</span>" +
-      '  <button type="button" class="btn-close btn-close-white" aria-label="Retirer" ' +
+      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
       '          data-remove-type="ingredient" data-remove-value="' +
       escapeHtml(selectedIngredientTags[i]) +
-      '"></button>' +
+      '">×</button>' +
       "</span> ";
   }
   for (i = 0; i < selectedApplianceTags.length; i++) {
     html +=
-      '<span class="badge rounded-pill text-bg-primary d-inline-flex align-items-center" style="gap:6px">' +
-      "  <span>" +
+      '<span class="tag">' +
+      '  <span class="tag-label">' +
       escapeHtml(selectedApplianceTags[i]) +
       "</span>" +
-      '  <button type="button" class="btn-close btn-close-white" aria-label="Retirer" ' +
+      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
       '          data-remove-type="appliance" data-remove-value="' +
       escapeHtml(selectedApplianceTags[i]) +
-      '"></button>' +
+      '">×</button>' +
       "</span> ";
   }
   for (i = 0; i < selectedUtensilTags.length; i++) {
     html +=
-      '<span class="badge rounded-pill text-bg-primary d-inline-flex align-items-center" style="gap:6px">' +
-      "  <span>" +
+      '<span class="tag">' +
+      '  <span class="tag-label">' +
       escapeHtml(selectedUtensilTags[i]) +
       "</span>" +
-      '  <button type="button" class="btn-close btn-close-white" aria-label="Retirer" ' +
+      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
       '          data-remove-type="utensil" data-remove-value="' +
       escapeHtml(selectedUtensilTags[i]) +
-      '"></button>' +
+      '">×</button>' +
       "</span> ";
   }
 
@@ -468,14 +563,20 @@ function getNoResultsMessage(query) {
   var msgEl = document.getElementById("no-results-message");
   if (!msgEl) return;
   var q = (query || "").trim();
-  msgEl.textContent =
-    q.length >= 3
-      ? "Aucune recette trouvée pour « " +
-        q +
-        " ». Essayez d'autres mots-clés ou tags."
-      : "Saisissez au moins 3 caractères pour lancer une recherche.";
+  var message = "";
+  if (q.length >= 3) {
+    message =
+      'Aucune recette trouvee pour "' +
+      q +
+      '". Essayez d\'autres mots-cles ou tags.';
+  } else if (q.length > 0) {
+    message = "Saisissez au moins 3 caracteres pour lancer une recherche.";
+  } else {
+    message =
+      "Aucune recette ne correspond aux filtres selectionnes. Ajustez vos tags ou ingredients.";
+  }
+  msgEl.textContent = message;
 }
-
 /* Fonction: refreshFacetsUI
    Rôle: Recalculer les facettes et mettre à jour dropdowns + badges */
 function refreshFacetsUI(results) {
@@ -504,8 +605,14 @@ function runSearch() {
     displayRecipes(currentRecipes, currentPage);
     refreshFacetsUI(currentRecipes);
     var noRes = document.getElementById("no-results");
-    if (noRes) noRes.style.display = "block";
-    getNoResultsMessage(q);
+    if (noRes) {
+      if (q.length > 0) {
+        noRes.style.display = "block";
+        getNoResultsMessage(q);
+      } else {
+        noRes.style.display = "none";
+      }
+    }
     return;
   }
 
@@ -538,13 +645,57 @@ function bindSearchUI() {
   }
 }
 
+function closeAllDropdowns(exceptDropdown) {
+  try {
+    var openMenus = document.querySelectorAll(".dropdown-menu.show");
+    for (var i = 0; i < openMenus.length; i++) {
+      var menu = openMenus[i];
+      if (!exceptDropdown || !exceptDropdown.contains(menu)) {
+        menu.classList.remove("show");
+      }
+    }
+  } catch (e) {}
+}
+
+function initDropdowns() {
+  var dropdowns = document.querySelectorAll(".dropdown");
+  if (!dropdowns.length) return;
+
+  document.addEventListener("click", function () {
+    closeAllDropdowns();
+  });
+
+  for (var i = 0; i < dropdowns.length; i++) {
+    (function (dropdown) {
+      var toggle = dropdown.querySelector(".dropdown-toggle");
+      var menu = dropdown.querySelector(".dropdown-menu");
+      if (!toggle || !menu) return;
+
+      toggle.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        var isOpen = menu.classList.contains("show");
+        closeAllDropdowns(dropdown);
+        if (!isOpen) {
+          menu.classList.add("show");
+        }
+      });
+
+      menu.addEventListener("click", function (event) {
+        event.stopPropagation();
+      });
+    })(dropdowns[i]);
+  }
+}
+
 /* Fonction: initHeroImage
-   Rôle: Définir l’image hero depuis la première recette si possible */
+   Rôle: Définir l'image hero depuis la première recette si possible */
 function initHeroImage() {
   try {
     var heroImg = document.getElementById("hero-img");
     if (
       heroImg &&
+      heroImg.dataset.static !== "true" &&
       currentRecipes &&
       currentRecipes[0] &&
       currentRecipes[0].image
@@ -577,6 +728,7 @@ function initApp() {
     refreshFacetsUI(currentRecipes);
     initHeroImage();
     bindSearchUI();
+    initDropdowns();
   } catch (err) {
     debug(
       "Erreur lors de l'initialisation: " +
@@ -588,3 +740,12 @@ function initApp() {
 }
 
 window.addEventListener("DOMContentLoaded", initApp);
+
+function renderTag(value) {
+  return `
+        <span class="tag">
+            ${escapeHtml(value)}
+            <span class="remove">×</span>
+        </span>
+    `;
+}
