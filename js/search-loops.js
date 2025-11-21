@@ -11,51 +11,52 @@ function loopNormalize(text) {
 /* Fonction: loopBuildIndex
    Rôle: Construire la chaîne indexable (nom, description, ingrédients, appareil, ustensiles, portions) */
 function loopBuildIndex(recipe) {
-  var s = "";
-  s += loopNormalize(recipe.name) + " ";
-  s += loopNormalize(recipe.description) + " ";
+  var baseParts = [
+    loopNormalize(recipe && recipe.name),
+    loopNormalize(recipe && recipe.description),
+    loopNormalize(recipe && recipe.appliance),
+  ];
 
-  if (recipe && recipe.ingredients && recipe.ingredients.length) {
-    for (var i = 0; i < recipe.ingredients.length; i++) {
-      var it = recipe.ingredients[i];
-      if (it && it.ingredient) s += loopNormalize(it.ingredient) + " ";
-      if (it && it.unit) s += loopNormalize(it.unit) + " ";
-    }
-  }
+  var ingredientParts = ((recipe && recipe.ingredients) || []).reduce(
+    function (acc, ing) {
+      if (!ing) return acc;
+      if (ing.ingredient) acc.push(loopNormalize(ing.ingredient));
+      if (ing.unit) acc.push(loopNormalize(ing.unit));
+      return acc;
+    },
+    []
+  );
 
-  s += loopNormalize(recipe.appliance) + " ";
+  var utensilParts = ((recipe && recipe.ustensils) || []).map(function (ut) {
+    return loopNormalize(ut);
+  });
 
-  if (recipe && recipe.ustensils && recipe.ustensils.length) {
-    for (var u = 0; u < recipe.ustensils.length; u++) {
-      s += loopNormalize(recipe.ustensils[u]) + " ";
-    }
-  }
+  var servingParts =
+    recipe && recipe.servings ? [String(recipe.servings)] : [];
 
-  if (recipe && recipe.servings) s += String(recipe.servings) + " ";
-
-  return s.trim();
+  return baseParts
+    .concat(ingredientParts, utensilParts, servingParts)
+    .filter(function (part) {
+      return part && part.length;
+    })
+    .join(" ")
+    .trim();
 }
 
 /* Fonction: loopIncludesAll
    Rôle: Vérifier que toutes les étiquettes sont présentes dans une liste de valeurs */
 function loopIncludesAll(tags, values) {
   if (!tags || !tags.length) return true;
-  for (var i = 0; i < tags.length; i++) {
-    var tag = loopNormalize(tags[i]);
-    var found = false;
-    for (var j = 0; j < values.length; j++) {
-      if (values[j].indexOf(tag) !== -1) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) return false;
-  }
-  return true;
+  return tags.every(function (tag) {
+    var normalizedTag = loopNormalize(tag);
+    return values.some(function (value) {
+      return value.indexOf(normalizedTag) !== -1;
+    });
+  });
 }
 
 /* Fonction: loopSearch
-   Rôle: Filtrer les recettes avec boucles (for/while) selon requête + tags en intersection */
+   Rôle: Filtrer les recettes selon requête + tags en intersection (approche fonctionnelle) */
 function loopSearch(options) {
   var data = options && options.data ? options.data : [];
   var query = options && options.query ? options.query : "";
@@ -66,37 +67,25 @@ function loopSearch(options) {
   var q = loopNormalize(query);
   var hasMain = q.length >= 3;
 
-  var out = [];
-  for (var i = 0; i < data.length; i++) {
-    var r = data[i];
+  return data.filter(function (r) {
     var idx = loopBuildIndex(r);
 
-    if (hasMain && idx.indexOf(q) === -1) continue;
+    if (hasMain && idx.indexOf(q) === -1) return false;
 
-    var ingVals = [];
-    if (r && r.ingredients && r.ingredients.length) {
-      for (var k = 0; k < r.ingredients.length; k++) {
-        var ing = r.ingredients[k];
-        if (ing && ing.ingredient)
-          ingVals[ingVals.length] = loopNormalize(ing.ingredient);
-      }
-    }
-    if (!loopIncludesAll(ingTags, ingVals)) continue;
+    var ingVals = ((r && r.ingredients) || []).reduce(function (acc, ing) {
+      if (ing && ing.ingredient) acc.push(loopNormalize(ing.ingredient));
+      return acc;
+    }, []);
+    if (!loopIncludesAll(ingTags, ingVals)) return false;
 
-    var appVals = [];
-    if (r && r.appliance) appVals[0] = loopNormalize(r.appliance);
-    if (!loopIncludesAll(appTags, appVals)) continue;
+    var appVals = r && r.appliance ? [loopNormalize(r.appliance)] : [];
+    if (!loopIncludesAll(appTags, appVals)) return false;
 
-    var ustVals = [];
-    if (r && r.ustensils && r.ustensils.length) {
-      for (var u = 0; u < r.ustensils.length; u++) {
-        ustVals[ustVals.length] = loopNormalize(r.ustensils[u]);
-      }
-    }
-    if (!loopIncludesAll(ustTags, ustVals)) continue;
+    var ustVals = ((r && r.ustensils) || []).map(function (ust) {
+      return loopNormalize(ust);
+    });
+    if (!loopIncludesAll(ustTags, ustVals)) return false;
 
-    out[out.length] = r;
-  }
-
-  return out;
+    return true;
+  });
 }

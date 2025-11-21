@@ -1,4 +1,4 @@
-// App (Version 2) — Boucles natives seulement: recherche + tags + pagination + debug
+
 
 var RECIPES_PER_PAGE = 9;
 var currentPage = 1;
@@ -89,10 +89,7 @@ function displayRecipes(recipesToDisplay, page) {
   var start = (page - 1) * RECIPES_PER_PAGE;
   var end = start + RECIPES_PER_PAGE;
 
-  var pageRecipes = [];
-  for (var i = start; i < end && i < recipesToDisplay.length; i++) {
-    pageRecipes[pageRecipes.length] = recipesToDisplay[i];
-  }
+  var pageRecipes = recipesToDisplay.slice(start, end);
 
   if (!pageRecipes.length) {
     if (noRes) noRes.style.display = "block";
@@ -103,27 +100,29 @@ function displayRecipes(recipesToDisplay, page) {
     if (noRes) noRes.style.display = "none";
   }
 
-  for (var r = 0; r < pageRecipes.length; r++) {
-    var recipe = pageRecipes[r];
+  pageRecipes.forEach(function (recipe) {
     var card = document.createElement("div");
     card.className = "col";
 
-    var ingredientsHtml = "";
-    if (recipe.ingredients && recipe.ingredients.length) {
-      for (var k = 0; k < recipe.ingredients.length; k++) {
-        var ing = recipe.ingredients[k];
-        ingredientsHtml +=
+    var ingredientsList =
+      recipe && recipe.ingredients && recipe.ingredients.length
+        ? recipe.ingredients
+        : [];
+    var ingredientsHtml = ingredientsList
+      .map(function (ing) {
+        return (
           '<div class="ingredient">' +
           '  <span class="ingredient-name">' +
-          escapeHtml(ing.ingredient || "") +
+          escapeHtml((ing && ing.ingredient) || "") +
           "</span>" +
           '  <span class="ingredient-quantity">' +
-          (ing.quantity ? escapeHtml(String(ing.quantity)) : "") +
-          (ing.unit ? " " + escapeHtml(ing.unit) : "") +
+          (ing && ing.quantity ? escapeHtml(String(ing.quantity)) : "") +
+          (ing && ing.unit ? " " + escapeHtml(ing.unit) : "") +
           "</span>" +
-          "</div>";
-      }
-    }
+          "</div>"
+        );
+      })
+      .join("");
 
     card.innerHTML =
       '<article class="card-recipe">' +
@@ -167,7 +166,7 @@ function displayRecipes(recipesToDisplay, page) {
     })(recipe, imgEl);
 
     grid.appendChild(card);
-  }
+  });
 
   updateCount(recipesToDisplay.length);
   updatePagination(recipesToDisplay.length, page);
@@ -189,23 +188,23 @@ function updatePagination(total, page) {
   var ul = document.createElement("ul");
   ul.className = "pagination";
 
-  for (var i = 1; i <= totalPages; i++) {
+  Array.from({ length: totalPages }, function (_, index) {
+    return index + 1;
+  }).forEach(function (pageNumber) {
     var li = document.createElement("li");
-    li.className = "page-item" + (i === page ? " active" : "");
+    li.className = "page-item" + (pageNumber === page ? " active" : "");
     var btn = document.createElement("button");
     btn.className = "page-link";
     btn.type = "button";
-    btn.setAttribute("data-page", String(i));
-    btn.textContent = String(i);
-    (function (iRef) {
-      btn.addEventListener("click", function () {
-        currentPage = iRef;
-        displayRecipes(currentRecipes, currentPage);
-      });
-    })(i);
+    btn.setAttribute("data-page", String(pageNumber));
+    btn.textContent = String(pageNumber);
+    btn.addEventListener("click", function () {
+      currentPage = pageNumber;
+      displayRecipes(currentRecipes, currentPage);
+    });
     li.appendChild(btn);
     ul.appendChild(li);
-  }
+  });
   pagination.innerHTML = "";
   pagination.appendChild(ul);
 }
@@ -242,57 +241,38 @@ function computeFacetsLoops(list) {
   var appMap = {};
   var ustMap = {};
 
-  for (var i = 0; i < list.length; i++) {
-    var r = list[i];
-
-    if (r && r.ingredients && r.ingredients.length) {
-      for (var j = 0; j < r.ingredients.length; j++) {
-        var rawIng =
-          r.ingredients[j] && r.ingredients[j].ingredient
-            ? r.ingredients[j].ingredient
-            : "";
-        var keyIng = loopNormalize(rawIng);
-        if (rawIng) ingMap[keyIng] = rawIng;
-      }
-    }
+  list.forEach(function (r) {
+    ((r && r.ingredients) || []).forEach(function (ingredientItem) {
+      var rawIng =
+        ingredientItem && ingredientItem.ingredient
+          ? ingredientItem.ingredient
+          : "";
+      var keyIng = loopNormalize(rawIng);
+      if (rawIng) ingMap[keyIng] = rawIng;
+    });
 
     if (r && r.appliance) {
       var keyApp = loopNormalize(r.appliance);
       appMap[keyApp] = r.appliance;
     }
 
-    if (r && r.ustensils && r.ustensils.length) {
-      for (var u = 0; u < r.ustensils.length; u++) {
-        var rawU = r.ustensils[u];
-        var keyU = loopNormalize(rawU);
-        if (rawU) ustMap[keyU] = rawU;
-      }
-    }
-  }
+    ((r && r.ustensils) || []).forEach(function (rawU) {
+      var keyU = loopNormalize(rawU);
+      if (rawU) ustMap[keyU] = rawU;
+    });
+  });
 
   // Convertir en tableaux triés (alphabétique insensible à la casse)
   function toSortedEntries(obj) {
-    var arr = [];
-    for (var k in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, k)) {
-        arr[arr.length] = [k, obj[k]];
-      }
-    }
-    // tri simple
-    for (var a = 0; a < arr.length - 1; a++) {
-      for (var b = a + 1; b < arr.length; b++) {
-        if (
-          String(arr[a][1]).localeCompare(String(arr[b][1]), "fr", {
-            sensitivity: "base",
-          }) > 0
-        ) {
-          var tmp = arr[a];
-          arr[a] = arr[b];
-          arr[b] = tmp;
-        }
-      }
-    }
-    return arr;
+    return Object.keys(obj)
+      .map(function (k) {
+        return [k, obj[k]];
+      })
+      .sort(function (a, b) {
+        return String(a[1]).localeCompare(String(b[1]), "fr", {
+          sensitivity: "base",
+        });
+      });
   }
 
   return {
@@ -316,9 +296,9 @@ function renderDropdown(ulId, entries, type) {
       ? selectedApplianceTags
       : selectedUtensilTags;
 
-  for (var s = 0; s < arr.length; s++) {
-    selectedSet[loopNormalize(arr[s])] = true;
-  }
+  arr.forEach(function (value) {
+    selectedSet[loopNormalize(value)] = true;
+  });
 
   var html = "";
   // input de recherche en tête du dropdown
@@ -333,9 +313,9 @@ function renderDropdown(ulId, entries, type) {
     html +=
       '<li><span class="dropdown-item text-muted" aria-disabled="true">Aucune option</span></li>';
   } else {
-    for (var i = 0; i < entries.length; i++) {
-      var key = entries[i][0];
-      var display = entries[i][1];
+    entries.forEach(function (entry) {
+      var key = entry[0];
+      var display = entry[1];
       var isSel = !!selectedSet[key];
 
       html += "<li>";
@@ -363,14 +343,14 @@ function renderDropdown(ulId, entries, type) {
           type +
           '" data-remove-value="' +
           escapeHtml(display) +
-          '">×</button>';
+          '">&times;</button>';
       } else {
         // chevron / rien à droite pour non sélectionné (ou icône si souhaité)
         html += '<span class="dropdown-item-empty"></span>';
       }
 
       html += "</button></li>";
-    }
+    });
   }
 
   ul.innerHTML = html;
@@ -381,70 +361,65 @@ function renderDropdown(ulId, entries, type) {
     searchInput.addEventListener("input", function () {
       var term = loopNormalize(this.value || "");
       var buttons = ul.querySelectorAll("button.dropdown-item");
-      for (var b = 0; b < buttons.length; b++) {
-        var btn = buttons[b];
+      Array.from(buttons).forEach(function (btn) {
         var label = btn.querySelector(".dropdown-item-label");
         var text = label
           ? loopNormalize(label.textContent || "")
           : loopNormalize(btn.textContent || "");
         btn.parentElement.style.display =
           text.indexOf(term) !== -1 ? "" : "none";
-      }
+      });
     });
   }
 
-  // clic sur option (ajout) — n'ajoute pas si déjà sélectionné
+  // clic sur option (ajout) – n'ajoute pas si déjà sélectionné
   var buttons = ul.querySelectorAll("button.dropdown-item");
-  for (var b2 = 0; b2 < buttons.length; b2++) {
-    (function (btn) {
-      btn.addEventListener("click", function (ev) {
-        // si on a cliqué sur la croix interne, ignorer (la suppression est gérée ailleurs)
-        if (
-          ev.target &&
-          ev.target.classList &&
-          ev.target.classList.contains("dropdown-remove")
-        ) {
-          return;
+  Array.from(buttons).forEach(function (btn) {
+    btn.addEventListener("click", function (ev) {
+      // si on a cliqué sur la croix interne, ignorer (la suppression est gérée ailleurs)
+      if (
+        ev.target &&
+        ev.target.classList &&
+        ev.target.classList.contains("dropdown-remove")
+      ) {
+        return;
+      }
+      // si l'item est marqué selected, ne rien faire
+      if (btn.classList.contains("selected")) return;
+      var typeAttr = btn.getAttribute("data-type");
+      var val = btn.getAttribute("data-value");
+      addTag(typeAttr, val);
+      closeAllDropdowns();
+      // fermer le dropdown bootstrap si disponible
+      try {
+        var dd = btn.closest(".dropdown");
+        if (dd) {
+          var toggle = dd.querySelector('[data-bs-toggle="dropdown"]');
+          if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
         }
-        // si l'item est marqué selected, ne rien faire
-        if (btn.classList.contains("selected")) return;
-        var typeAttr = btn.getAttribute("data-type");
-        var val = btn.getAttribute("data-value");
-        addTag(typeAttr, val);
-        closeAllDropdowns();
-        // fermer le dropdown bootstrap si disponible
-        try {
-          var dd = btn.closest(".dropdown");
-          if (dd) {
-            var toggle = dd.querySelector('[data-bs-toggle="dropdown"]');
-            if (toggle) bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
-          }
-        } catch (e) {}
-      });
-    })(buttons[b2]);
-  }
+      } catch (e) {}
+    });
+  });
 
   // clic sur la croix de suppression dans le dropdown
   var removes = ul.querySelectorAll(".dropdown-remove");
-  for (var r = 0; r < removes.length; r++) {
-    (function (rm) {
-      rm.addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        var t = rm.getAttribute("data-remove-type");
-        var v = rm.getAttribute("data-remove-value");
-        removeTag(t, v);
-        closeAllDropdowns();
-        // fermer le dropdown bootstrap si disponible
-        try {
-          var dd2 = rm.closest(".dropdown");
-          if (dd2) {
-            var toggle2 = dd2.querySelector('[data-bs-toggle="dropdown"]');
-            if (toggle2) bootstrap.Dropdown.getOrCreateInstance(toggle2).hide();
-          }
-        } catch (e) {}
-      });
-    })(removes[r]);
-  }
+  Array.from(removes).forEach(function (rm) {
+    rm.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      var t = rm.getAttribute("data-remove-type");
+      var v = rm.getAttribute("data-remove-value");
+      removeTag(t, v);
+      closeAllDropdowns();
+      // fermer le dropdown bootstrap si disponible
+      try {
+        var dd2 = rm.closest(".dropdown");
+        if (dd2) {
+          var toggle2 = dd2.querySelector('[data-bs-toggle="dropdown"]');
+          if (toggle2) bootstrap.Dropdown.getOrCreateInstance(toggle2).hide();
+        }
+      } catch (e) {}
+    });
+  });
 }
 
 /* Fonction: renderSelectedTags
@@ -453,58 +428,39 @@ function renderSelectedTags() {
   var zone = document.getElementById("selected-tags");
   if (!zone) return;
 
-  var html = "";
-  var i;
+  var htmlParts = [];
+  var appendTag = function (list, type) {
+    list.forEach(function (value) {
+      htmlParts.push(
+        '<span class="tag">' +
+          '  <span class="tag-label">' +
+          escapeHtml(value) +
+          "</span>" +
+          '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
+          '          data-remove-type="' +
+          type +
+          '" data-remove-value="' +
+          escapeHtml(value) +
+          '">&times;</button>' +
+          "</span> "
+      );
+    });
+  };
 
-  for (i = 0; i < selectedIngredientTags.length; i++) {
-    html +=
-      '<span class="tag">' +
-      '  <span class="tag-label">' +
-      escapeHtml(selectedIngredientTags[i]) +
-      "</span>" +
-      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
-      '          data-remove-type="ingredient" data-remove-value="' +
-      escapeHtml(selectedIngredientTags[i]) +
-      '">×</button>' +
-      "</span> ";
-  }
-  for (i = 0; i < selectedApplianceTags.length; i++) {
-    html +=
-      '<span class="tag">' +
-      '  <span class="tag-label">' +
-      escapeHtml(selectedApplianceTags[i]) +
-      "</span>" +
-      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
-      '          data-remove-type="appliance" data-remove-value="' +
-      escapeHtml(selectedApplianceTags[i]) +
-      '">×</button>' +
-      "</span> ";
-  }
-  for (i = 0; i < selectedUtensilTags.length; i++) {
-    html +=
-      '<span class="tag">' +
-      '  <span class="tag-label">' +
-      escapeHtml(selectedUtensilTags[i]) +
-      "</span>" +
-      '  <button type="button" class="tag-remove-simple" aria-label="Retirer" ' +
-      '          data-remove-type="utensil" data-remove-value="' +
-      escapeHtml(selectedUtensilTags[i]) +
-      '">×</button>' +
-      "</span> ";
-  }
+  appendTag(selectedIngredientTags, "ingredient");
+  appendTag(selectedApplianceTags, "appliance");
+  appendTag(selectedUtensilTags, "utensil");
 
-  zone.innerHTML = html;
+  zone.innerHTML = htmlParts.join("");
 
   var closeBtns = zone.querySelectorAll("button[data-remove-type]");
-  for (var c = 0; c < closeBtns.length; c++) {
-    (function (btn) {
-      btn.addEventListener("click", function () {
-        var type = btn.getAttribute("data-remove-type");
-        var val = btn.getAttribute("data-remove-value");
-        removeTag(type, val);
-      });
-    })(closeBtns[c]);
-  }
+  Array.from(closeBtns).forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var type = btn.getAttribute("data-remove-type");
+      var val = btn.getAttribute("data-remove-value");
+      removeTag(type, val);
+    });
+  });
 }
 
 /* Fonction: addTag
@@ -530,11 +486,9 @@ function removeTag(type, value) {
   if (!value) return;
 
   function removeFrom(arr, val) {
-    var next = [];
-    for (var i = 0; i < arr.length; i++) {
-      if (arr[i] !== val) next[next.length] = arr[i];
-    }
-    return next;
+    return arr.filter(function (item) {
+      return item !== val;
+    });
   }
 
   if (type === "ingredient")
@@ -551,10 +505,9 @@ function removeTag(type, value) {
    Rôle: Vérifier présence d’une valeur (insensible à la casse/accents) dans un tableau */
 function containsValue(arr, val) {
   var target = loopNormalize(val);
-  for (var i = 0; i < arr.length; i++) {
-    if (loopNormalize(arr[i]) === target) return true;
-  }
-  return false;
+  return arr.some(function (item) {
+    return loopNormalize(item) === target;
+  });
 }
 
 /* Fonction: getNoResultsMessage
@@ -648,12 +601,11 @@ function bindSearchUI() {
 function closeAllDropdowns(exceptDropdown) {
   try {
     var openMenus = document.querySelectorAll(".dropdown-menu.show");
-    for (var i = 0; i < openMenus.length; i++) {
-      var menu = openMenus[i];
+    Array.from(openMenus).forEach(function (menu) {
       if (!exceptDropdown || !exceptDropdown.contains(menu)) {
         menu.classList.remove("show");
       }
-    }
+    });
   } catch (e) {}
 }
 
@@ -665,27 +617,25 @@ function initDropdowns() {
     closeAllDropdowns();
   });
 
-  for (var i = 0; i < dropdowns.length; i++) {
-    (function (dropdown) {
-      var toggle = dropdown.querySelector(".dropdown-toggle");
-      var menu = dropdown.querySelector(".dropdown-menu");
-      if (!toggle || !menu) return;
+  Array.from(dropdowns).forEach(function (dropdown) {
+    var toggle = dropdown.querySelector(".dropdown-toggle");
+    var menu = dropdown.querySelector(".dropdown-menu");
+    if (!toggle || !menu) return;
 
-      toggle.addEventListener("click", function (event) {
-        event.preventDefault();
-        event.stopPropagation();
-        var isOpen = menu.classList.contains("show");
-        closeAllDropdowns(dropdown);
-        if (!isOpen) {
-          menu.classList.add("show");
-        }
-      });
+    toggle.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      var isOpen = menu.classList.contains("show");
+      closeAllDropdowns(dropdown);
+      if (!isOpen) {
+        menu.classList.add("show");
+      }
+    });
 
-      menu.addEventListener("click", function (event) {
-        event.stopPropagation();
-      });
-    })(dropdowns[i]);
-  }
+    menu.addEventListener("click", function (event) {
+      event.stopPropagation();
+    });
+  });
 }
 
 /* Fonction: initHeroImage
@@ -745,7 +695,7 @@ function renderTag(value) {
   return `
         <span class="tag">
             ${escapeHtml(value)}
-            <span class="remove">×</span>
+            <span class="remove">&times;</span>
         </span>
     `;
 }
