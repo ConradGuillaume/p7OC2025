@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html lang="fr">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Les Petits Plats</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
       rel="stylesheet"
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    >
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
       href="https://fonts.googleapis.com/css2?family=Anton&display=swap"
       rel="stylesheet"
-    />
-    <link rel="stylesheet" href="style.css" />
+    >
+    <link rel="stylesheet" href="style.css">
   </head>
   <body class="bg-light">
     <!-- Header & Hero -->
@@ -28,7 +28,7 @@
             src="images/lampos-aritonang-24gR_9lCdes-unsplash.jpg"
             alt="Hero"
             class="w-100"
-          />
+          >
           <div class="hero-overlay" aria-hidden="true"></div>
           <div class="hero-content">
             <div class="position-absolute top-0 start-0 p-3 hero-logo">
@@ -37,12 +37,12 @@
                 alt="Les Petits Plats"
                 class="img-fluid"
                 style="max-width: 180px"
-              />
+              >
             </div>
             <div class="d-flex justify-content-center align-items-center h-100">
               <div class="mx-auto text-center hero-inner">
                 <h1 class="hero-title mb-3">
-                  CHERCHEZ PARMI PLUS DE 1500 RECETTES<br />DU QUOTIDIEN,
+                  CHERCHEZ PARMI PLUS DE 1500 RECETTES<br>DU QUOTIDIEN,
                   SIMPLES ET DÉLICIEUSES
                 </h1>
                 <div class="hero-search">
@@ -59,7 +59,7 @@
                         class="form-control"
                         placeholder="Rechercher une recette, un ingrédient..."
                         aria-label="Recherche"
-                      />
+                      >
                       <button
                         type="submit"
                         class="search-btn-svg"
@@ -95,6 +95,7 @@
 
     <!-- Message area for no results -->
     <section class="container mb-3" id="no-results" style="display: none">
+      <h2 class="visually-hidden">Aucun résultat</h2>
       <div class="alert alert-warning text-center">
         <span id="no-results-message"
           >Aucune recette trouvée. Essayez d'autres mots-clés ou tags.</span
@@ -108,6 +109,7 @@
     <!-- Recipes grid -->
     <main class="container">
       <section class="container mb-3">
+        <h2 class="visually-hidden">Filtres et tags</h2>
         <div id="filters-row" class="row g-2 align-items-center">
           <div class="col-md-2">
             <div class="dropdown">
